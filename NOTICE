@@ -1,0 +1,5 @@
+Pharma Custody
+Copyright 2026 Embryo Space Inc. (DBA BSVKey)
+
+lib/canonical.mjs, lib/keys.mjs, lib/receipt.mjs and lib/merkle.mjs are copied unmodified
+from BSVKey/dtn-custody-demo (commit e6bee3b), Copyright 2026 Embryo Space Inc., Apache-2.0.
