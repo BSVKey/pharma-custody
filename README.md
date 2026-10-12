@@ -33,6 +33,9 @@ Tampering:
   pharmacy's release is forged by another party              caught
   packs swapped mid-route (different unit set at the DC)     caught
   warehouse leg withheld                                     caught
+
+Correction filed 22 h after the release: PASS
+  decision at the time "quarantine" stands; with the correction it would be "release" (20 of 45 min)
 ```
 
 The carrier's excursion alone was within budget; the warehouse's logger gap is what
@@ -44,12 +47,19 @@ pushed the shipment into quarantine, and the record says so.
 |---|---|---|
 | `pharma.handoff/1` | the receiving custodian | received this shipment from that custodian at this time, these units (a Merkle root over the packs' product identifiers), in this condition; names the previous handoff |
 | `pharma.leg/1` | the custodian holding the shipment | which logger, which time window, a fingerprint of exactly the samples in that window, and what they show: range, excursions, gaps |
-| `pharma.release/1` | the final receiver's quality function | total excursion and gap time against the stability budget, and the decision |
+| `pharma.release/1` | the final receiver's quality function | total excursion and gap time against the stability budget, the legs it relied on, and the decision |
+| `pharma.correction/1` | the author of an earlier leg | that leg was wrong, why, and which leg replaces it; the wrong leg is kept, not edited or deleted |
+| `pharma.estimate/1` | a custodian | a modelled temperature range for a stretch with no logger data, labelled as modelled |
+
+Every record carries the time of the event and the time it was recorded (`recordedAt`).
 
 Packs are identified by their product identifier: GTIN, serial number, lot and expiry,
 the data elements carried in the 2D barcode under the US Drug Supply Chain Security Act.
 Any single pack can be proven part of a shipment with a short inclusion proof, without
-revealing the other packs.
+revealing the other packs. Each pack's leaf is salted (`salted-leaf/1`): serial numbers
+are often sequential, and without a salt the sibling hashes in one pack's proof could be
+matched against guessed serials to reveal its neighbours. The salt for a pack goes only to
+whoever holds that pack.
 
 All records use canonical JSON, a SHA-256 content id and an Ed25519 signature, the same
 primitives as BSVKey's other custody records.
@@ -65,7 +75,18 @@ primitives as BSVKey's other custody records.
 - Custody time not covered by any leg is reported and forces quarantine.
 - Logger gaps are unknown temperature and count against the excursion budget by default
   (`spec.gapsCount: false` to report them without counting).
-- The release decision must follow from the recomputed totals.
+- The release decision must follow from the recomputed totals, and must list exactly
+  the legs it relied on, so a withheld leg is caught.
+- A leg can only be corrected by its author. The corrected leg stays in the package and
+  is reported in `history`; deleting it instead is flagged. A replacement leg with no
+  correction is double counting and is flagged.
+- The release is judged on what had been recorded by its decision time. A correction
+  that arrives later is reported as `decision_changed_by_later_evidence`, with both the
+  decision-time and current outcomes, instead of silently rewriting the record. The idea
+  follows the GS1 EPCIS 2.0 ErrorDeclaration: correcting a record is not a new event.
+- A record cannot be recorded before the event it describes.
+- Modelled estimates are listed under `modelled`, only inside stretches with no logger
+  data, and never reduce gap time or change the decision.
 
 ## Scope
 

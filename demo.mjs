@@ -11,10 +11,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { genKeypair } from "./lib/keys.mjs";
 import { signRecord } from "./lib/receipt.mjs";
-import { parseLoggerCsv } from "./src/logger.mjs";
+import { parseLoggerCsv, windowOf, fingerprint, analyse } from "./src/logger.mjs";
 import { buildShipment } from "./src/shipment.mjs";
 import { verifyShipment } from "./src/verify.mjs";
-import { unitProof, unitInShipment } from "./src/records.mjs";
+import { unitProof, unitInShipment, leg, correction } from "./src/records.mjs";
 
 const T0 = Date.parse("2026-10-05T06:00:00Z"), MIN = 60000, H = 60 * MIN;
 const spec = { minC: 2, maxC: 8, budgetMinutes: 45, intervalMs: 5 * MIN };
@@ -75,6 +75,18 @@ try {
   attempt("pharmacy's release is forged by another party", (p) => { const { claimId, sig, signerPub, ...c } = p.release; p.release = signRecord(genKeypair(), c); });
   attempt("packs swapped mid-route (different unit set at the DC)", (p) => { const h = p.handoffs[2]; const { claimId, sig, signerPub, ...c } = h; p.handoffs[2] = signRecord(dc.kp, { ...c, unitsRoot: "00".repeat(32) }); });
   attempt("warehouse leg withheld", (p) => { p.legs.splice(2, 1); });
+
+  // The warehouse later finds its backup logger covered the silent 50 minutes, and files
+  // a corrected leg after the pharmacy has already decided. The old leg stays on record.
+  const backup = new Map([...load(), ["warehouse-logger-03b", parseLoggerCsv(csv(T0 + 10 * H, T0 + 30 * H, base)).samples]]);
+  const win = windowOf(backup.get("warehouse-logger-03b"), T0 + 10 * H, T0 + 30 * H);
+  const fixed = leg(dc.kp, { shipmentId: pkg.shipmentId, custodian: "distributor-dc", loggerId: "warehouse-logger-03b", from: T0 + 10 * H, to: T0 + 30 * H, recordedAt: T0 + 52 * H, spec, fingerprint: fingerprint(win), analysis: analyse(win, { ...spec, from: T0 + 10 * H, to: T0 + 30 * H }) });
+  const corr = correction(dc.kp, { shipmentId: pkg.shipmentId, by: "distributor-dc", corrects: pkg.legs[2].claimId, replacedBy: fixed.claimId, reason: "backup logger 03b covered the gap on 03", recordedAt: T0 + 52 * H });
+  const later = verifyShipment({ ...pkg, legs: [...pkg.legs, fixed], corrections: [corr] }, { custodianPubs: pins, logs: backup });
+  console.log(`
+Correction filed 22 h after the release: ${later.ok ? "PASS" : "FAIL " + JSON.stringify(later.problems)}`);
+  console.log(`  decision at the time "${later.expected}" stands; with the correction it would be "${later.current.expected}" (${later.current.chargedMinutes} of ${spec.budgetMinutes} min)`);
+  console.log(`  superseded leg kept on record: ${later.history[0].leg.slice(0, 18)}..., reason "${later.history[0].reason}"`);
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
