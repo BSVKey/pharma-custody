@@ -41,6 +41,30 @@ Correction filed 22 h after the release: PASS
 The carrier's excursion alone was within budget; the warehouse's logger gap is what
 pushed the shipment into quarantine, and the record says so.
 
+## Medical demo: vaccines to a clinic with no network
+
+```
+node demo-medical.mjs              # temp folder, removed afterwards
+node demo-medical.mjs --out DIR    # keeps the logger CSVs and the custody bundle
+```
+
+500 vaccine vials go national store -> regional cold room -> district outreach team (cold
+box on a motorbike) -> rural clinic. The cold room's logger is silent for 40 minutes in a
+power cut, and the cold box freezes for 35 minutes because its ice packs went in straight
+from the freezer. The clinic signs its receipt and quarantine decision offline. The custody
+package travels back as one file, hop by hop, and the national store verifies it from the
+raw logger exports:
+
+```
+Verified at the national store from the raw logger CSVs: PASS
+Excursions 35 min + logger gaps 40 min (unknown temperature, counted) = 75 of 60 min allowed: decision "quarantine" (evidence says "quarantine")
+  logger_gap   regional-coldroom  10-06 00:00 to 10-06 00:40 UTC, 40 min
+  excursion    district-outreach  10-06 12:10 to 10-06 12:45 UTC, 35 min, low -0.8 C
+```
+
+Each vial can be checked against the run, and the same six kinds of tampering are caught.
+No patient data is involved: the records cover vials, custodians, times and temperatures.
+
 ## Records
 
 | Record | Signed by | Says |
