@@ -65,6 +65,33 @@ Excursions 35 min + logger gaps 40 min (unknown temperature, counted) = 75 of 60
 Each vial can be checked against the run, and the same six kinds of tampering are caught.
 No patient data is involved: the records cover vials, custodians, times and temperatures.
 
+## Organ and specimen demo
+
+```
+node demo-organ.mjs              # temp folder, removed afterwards
+node demo-organ.mjs --out DIR    # keeps the logger CSVs and both custody bundles
+```
+
+A donor kidney flies as commercial air cargo: organ procurement organization -> courier ->
+airline -> courier -> transplant center. It misses its connection and the airline holds it
+5 hours longer than planned. The temperature stays within budget, but the signed handoffs
+show the time out of body ran over the limit the accepting surgeon set, and which custodian
+the lost hours belong to:
+
+```
+Time out of body, recovery to arrival: 14 h 30 min (planned 9 h 30 min), limit 12 h 00 min: OVER, surgeon review before use
+Delay by custodian (held vs planned):
+  airline      held 9 h 00 min   +5 h 00 min late
+```
+
+Each handoff is signed by the party that received the organ, so nobody can move the time
+they handed it over. Backdating a pickup, re-signing someone else's handoff, editing the
+arrival time, deleting logger rows and substituting a different organ are all caught.
+
+A second run sends a pathology tissue block to an outside reference lab. The lab proves the
+block it received is the one the hospital sent, and a block from another case fails the
+check. Identifiers are fictional and no patient data is in any record.
+
 ## Records
 
 | Record | Signed by | Says |
